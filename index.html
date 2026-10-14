@@ -279,7 +279,7 @@
 
           <!-- Outer Number Ring Background -->
           <circle cx="0" cy="0" r="235" fill="url(#rimGrad)" stroke="#334155" stroke-width="4" />
-          <circle cx="0" cy="0" r="202" fill="#0b0f19" stroke="#475569" stroke-width="2" />
+          <circle cx="0" cy="0" r="203" fill="#0b0f19" stroke="#475569" stroke-width="2" />
 
           <!-- Sectors group (generated dynamically in JS for crisp accuracy) -->
           <g id="sectorsGroup"></g>
@@ -458,16 +458,16 @@
     const SECTORS_ORDER = [20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5];
 
     const RADIUS = {
-      DOUBLE_BULL: 11,     // 50 pts
-      SINGLE_BULL: 26,     // 25 pts
-      INNER_SINGLE_MIN: 26,
-      INNER_SINGLE_MAX: 113,
-      TRIPLE_MIN: 113,
-      TRIPLE_MAX: 128,
-      OUTER_SINGLE_MIN: 128,
-      OUTER_SINGLE_MAX: 188,
-      DOUBLE_MIN: 188,
-      DOUBLE_MAX: 202
+      DOUBLE_BULL: 13,     // 50 pts
+      SINGLE_BULL: 28,     // 25 pts
+      INNER_SINGLE_MIN: 28,
+      INNER_SINGLE_MAX: 98,
+      TRIPLE_MIN: 98,      // Triple band: 98 to 132 (34 units wide - more than 2x standard!)
+      TRIPLE_MAX: 132,
+      OUTER_SINGLE_MIN: 132,
+      OUTER_SINGLE_MAX: 174,
+      DOUBLE_MIN: 174,     // Double band: 174 to 203 (29 units wide - more than 2x standard!)
+      DOUBLE_MAX: 203
     };
 
     const COLORS = {
