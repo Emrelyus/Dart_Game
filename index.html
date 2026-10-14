@@ -1,0 +1,1334 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Dart Masters X01 - İnteraktif Skor Tahtası</title>
+
+  <!-- PWA & Mobile Web App Meta Tags -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Dart Masters">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Inter & Orbitron for score numbers -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Orbitron:wght@600;800;900&display=swap" rel="stylesheet">
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <style>
+    * {
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #0b0f19;
+      user-select: none;
+    }
+    .font-digital {
+      font-family: 'Orbitron', monospace;
+    }
+
+    /* Dartboard interactive sector styles */
+    .dart-sector {
+      cursor: pointer;
+      transition: filter 0.15s ease, transform 0.1s ease;
+      stroke: #1f2937;
+      stroke-width: 0.8;
+    }
+    .dart-sector:hover {
+      filter: brightness(1.55) drop-shadow(0 0 6px rgba(255, 255, 255, 0.7));
+      stroke: #ffffff;
+      stroke-width: 1.5;
+    }
+    .dart-sector:active {
+      transform: scale(0.995);
+      filter: brightness(1.85);
+    }
+
+    /* Marker Pin Animation */
+    @keyframes pinPop {
+      0% { transform: scale(0); opacity: 0; }
+      70% { transform: scale(1.3); opacity: 1; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .dart-marker {
+      animation: pinPop 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+      pointer-events: none;
+    }
+
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #111827;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #374151;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #4b5563;
+    }
+  </style>
+</head>
+<body class="text-slate-100 min-h-screen flex flex-col justify-between selection:bg-amber-500 selection:text-black">
+
+  <!-- Header -->
+  <header class="border-b border-slate-800/80 bg-slate-900/90 backdrop-blur sticky top-0 z-40 px-3 md:px-5 py-2.5">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2.5">
+      
+      <!-- Brand & Title -->
+      <div class="flex items-center gap-2.5">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 via-amber-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-amber-500/20 flex-shrink-0">
+          <svg class="w-6 h-6 text-black" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-lg md:text-xl font-extrabold tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-amber-400 via-orange-300 to-rose-400 font-digital">
+              DART MASTERS X01
+            </h1>
+            <span id="saveBadge" class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30" title="Her atış otomatik olarak tablette saklanır">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              Kayıtlı
+            </span>
+          </div>
+          <p class="text-[11px] text-slate-400 font-medium">İnteraktif Tahta & Tablet Skor Takibi</p>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+        <!-- PWA Install Button (Dynamic) -->
+        <button id="btnInstallPwa" class="hidden px-3 py-1.5 rounded-lg text-xs md:text-sm font-bold bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 transition shadow-lg shadow-amber-500/20 flex items-center gap-1.5 active:scale-95">
+          <svg class="w-4 h-4 text-slate-950" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+          </svg>
+          <span>Tablete Yükle</span>
+        </button>
+
+        <!-- Match History Button -->
+        <button id="btnOpenHistory" class="px-3 py-1.5 rounded-lg text-xs md:text-sm font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition flex items-center gap-1.5 shadow active:scale-95">
+          <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          <span>Geçmiş</span>
+        </button>
+
+        <!-- New Game Setup Button -->
+        <button id="btnOpenSetup" class="px-3 py-1.5 rounded-lg text-xs md:text-sm font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition flex items-center gap-1.5 shadow active:scale-95">
+          <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6-0H6"/>
+          </svg>
+          <span>Yeni Oyun</span>
+        </button>
+
+        <!-- Reset Button -->
+        <button id="btnResetCurrent" class="px-3 py-1.5 rounded-lg text-xs md:text-sm font-semibold bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 transition active:scale-95">
+          Sıfırla
+        </button>
+
+        <!-- Fullscreen Toggle Button -->
+        <button id="btnToggleFullscreen" class="p-1.5 md:p-2 rounded-lg text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition active:scale-95" title="Tam Ekran">
+          <svg id="iconFullscreen" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
+          </svg>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- Main Content Layout -->
+  <main class="max-w-7xl mx-auto w-full p-3 sm:p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 flex-grow items-start">
+
+    <!-- Left / Scoreboards & Active Player HUD (5 cols) -->
+    <div class="lg:col-span-5 flex flex-col gap-4 order-2 lg:order-1">
+      
+      <!-- Current Active Turn Card -->
+      <div id="activePlayerCard" class="relative overflow-hidden rounded-2xl bg-gradient-to-b from-slate-800 to-slate-900 border-2 border-amber-500/60 p-4 sm:p-5 shadow-2xl shadow-amber-500/10">
+        <div class="absolute -right-6 -bottom-6 w-32 h-32 bg-amber-500/10 rounded-full blur-2xl pointer-events-none"></div>
+
+        <div class="flex items-center justify-between mb-2 sm:mb-3">
+          <div class="flex items-center gap-2">
+            <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span class="text-xs uppercase tracking-wider font-bold text-amber-400">Sıradaki Oyuncu</span>
+          </div>
+          <span id="turnRoundBadge" class="text-xs bg-slate-700/80 text-slate-300 px-2.5 py-0.5 rounded-full font-medium">Tur 1</span>
+        </div>
+
+        <div class="flex items-baseline justify-between">
+          <h2 id="activePlayerName" class="text-xl sm:text-2xl font-black text-white tracking-wide truncate max-w-[200px]">Oyuncu 1</h2>
+          <div class="text-right">
+            <span class="text-[11px] text-slate-400 uppercase font-semibold">Hedef Kalan</span>
+            <div id="activePlayerScore" class="text-4xl md:text-5xl font-extrabold text-amber-400 font-digital tracking-tight">301</div>
+          </div>
+        </div>
+
+        <!-- 3 Darts Status Row -->
+        <div class="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-slate-700/60">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-semibold text-slate-400 tracking-wide">3 ATIŞ HAKKI</span>
+            <span class="text-xs font-bold text-slate-300">Tur Toplamı: <span id="currentTurnSum" class="text-amber-400 font-digital text-sm">0</span></span>
+          </div>
+          
+          <div class="grid grid-cols-3 gap-2">
+            <!-- Dart 1 -->
+            <div id="slotDart0" class="flex flex-col items-center justify-center py-2 px-1 bg-slate-950/60 border border-slate-700 rounded-xl transition duration-150">
+              <span class="text-[10px] font-bold text-slate-500 uppercase">1. Atış</span>
+              <span class="dart-label text-base font-bold text-slate-200 mt-0.5 font-digital">-</span>
+              <span class="dart-sub text-[11px] text-slate-400 font-medium">0 p</span>
+            </div>
+            <!-- Dart 2 -->
+            <div id="slotDart1" class="flex flex-col items-center justify-center py-2 px-1 bg-slate-950/60 border border-slate-700 rounded-xl transition duration-150">
+              <span class="text-[10px] font-bold text-slate-500 uppercase">2. Atış</span>
+              <span class="dart-label text-base font-bold text-slate-200 mt-0.5 font-digital">-</span>
+              <span class="dart-sub text-[11px] text-slate-400 font-medium">0 p</span>
+            </div>
+            <!-- Dart 3 -->
+            <div id="slotDart2" class="flex flex-col items-center justify-center py-2 px-1 bg-slate-950/60 border border-slate-700 rounded-xl transition duration-150">
+              <span class="text-[10px] font-bold text-slate-500 uppercase">3. Atış</span>
+              <span class="dart-label text-base font-bold text-slate-200 mt-0.5 font-digital">-</span>
+              <span class="dart-sub text-[11px] text-slate-400 font-medium">0 p</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action Buttons for Current Turn -->
+        <div class="mt-4 flex items-center gap-2">
+          <button id="btnUndoDart" class="flex-1 py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition border border-slate-700 flex items-center justify-center gap-1.5 active:scale-95 disabled:opacity-40 disabled:pointer-events-none">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
+            </svg>
+            Geri Al
+          </button>
+          
+          <button id="btnMissDart" class="py-2.5 px-3.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 font-semibold text-xs border border-rose-500/30 transition active:scale-95">
+            0 (Karavana)
+          </button>
+
+          <button id="btnPassTurn" class="flex-1 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition shadow-md shadow-emerald-700/30 flex items-center justify-center gap-1.5 active:scale-95 disabled:opacity-40">
+            Turu Bitir
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Quick Status Alert Notification banner inside card -->
+        <div id="turnMessage" class="hidden mt-3 py-1.5 px-3 rounded-lg text-xs font-semibold text-center border"></div>
+      </div>
+
+      <!-- All Players List -->
+      <div class="bg-slate-900/80 rounded-2xl border border-slate-800 p-4">
+        <div class="flex items-center justify-between pb-3 mb-3 border-b border-slate-800">
+          <span class="text-xs font-bold tracking-wider text-slate-400 uppercase">Oyuncu Sıralaması & Skorlar</span>
+          <span id="gameInfoBadge" class="text-xs font-medium text-amber-400/90 bg-amber-400/10 px-2 py-0.5 rounded">301 Oyunu</span>
+        </div>
+
+        <div id="playersListContainer" class="flex flex-col gap-2.5">
+          <!-- Populated via JS -->
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Right / Interactive Dartboard Section (7 cols) -->
+    <div class="lg:col-span-7 flex flex-col items-center justify-center order-1 lg:order-2 bg-slate-900/60 rounded-3xl border border-slate-800/80 p-3 sm:p-5 md:p-6 shadow-xl relative">
+      
+      <!-- Top hint -->
+      <div class="w-full flex items-center justify-between text-xs text-slate-400 mb-2 px-1">
+        <span class="flex items-center gap-1.5">
+          <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+          Hedef dilime dokunun
+        </span>
+        <span class="text-[11px] text-slate-400">Tekil, Çift (Dış x2), Üçlü (İç x3)</span>
+      </div>
+
+      <!-- Dartboard SVG Canvas Container -->
+      <div class="w-full max-w-[500px] aspect-square relative select-none flex items-center justify-center">
+        <!-- SVG Dartboard -->
+        <svg id="dartboardSvg" viewBox="-240 -240 480 480" class="w-full h-full drop-shadow-[0_15px_35px_rgba(0,0,0,0.85)] overflow-visible">
+          
+          <defs>
+            <!-- Drop shadow filters -->
+            <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000000" flood-opacity="0.8"/>
+            </filter>
+            <!-- Radial gradient for board rim -->
+            <radialGradient id="rimGrad" cx="50%" cy="50%" r="50%">
+              <stop offset="85%" stop-color="#0f172a" />
+              <stop offset="97%" stop-color="#1e293b" />
+              <stop offset="100%" stop-color="#090d16" />
+            </radialGradient>
+          </defs>
+
+          <!-- Outer Number Ring Background -->
+          <circle cx="0" cy="0" r="235" fill="url(#rimGrad)" stroke="#334155" stroke-width="4" />
+          <circle cx="0" cy="0" r="172" fill="#0b0f19" stroke="#475569" stroke-width="2" />
+
+          <!-- Sectors group (generated dynamically in JS for crisp accuracy) -->
+          <g id="sectorsGroup"></g>
+
+          <!-- Numbers Layer around the perimeter -->
+          <g id="numbersGroup" class="pointer-events-none"></g>
+
+          <!-- Dynamic hit pins / darts markers placed on the board -->
+          <g id="dartPinsGroup"></g>
+        </svg>
+      </div>
+
+      <!-- Board Helper Legends -->
+      <div class="mt-4 flex flex-wrap items-center justify-center gap-3 sm:gap-4 text-xs text-slate-400 font-medium">
+        <div class="flex items-center gap-1.5">
+          <span class="w-3.5 h-3.5 rounded-full bg-red-600 inline-block border border-slate-700"></span>
+          <span>D-Bull (50p)</span>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <span class="w-3.5 h-3.5 rounded-full bg-emerald-600 inline-block border border-slate-700"></span>
+          <span>Bull (25p)</span>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <span class="w-3.5 h-2 rounded bg-emerald-600 inline-block border border-slate-700"></span>
+          <span>Triple x3 / Double x2</span>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Setup Modal (Configure players and starting score) -->
+  <div id="setupModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 w-full max-w-lg rounded-2xl shadow-2xl p-6 overflow-hidden">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <h3 class="text-lg font-bold text-white flex items-center gap-2">
+          <span class="text-amber-400 font-digital">Yeni Oyun Ayarları</span>
+        </h3>
+        <button id="btnCloseSetup" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="mt-4 space-y-4">
+        <!-- Target Score -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Hedef Skor (X01)</label>
+          <div class="grid grid-cols-4 gap-2">
+            <button type="button" data-score="201" class="score-btn py-2 text-sm font-bold rounded-xl border border-slate-700 bg-slate-800 text-slate-300 hover:border-amber-400">201</button>
+            <button type="button" data-score="301" class="score-btn py-2 text-sm font-bold rounded-xl border-2 border-amber-500 bg-amber-500/20 text-amber-300">301</button>
+            <button type="button" data-score="401" class="score-btn py-2 text-sm font-bold rounded-xl border border-slate-700 bg-slate-800 text-slate-300 hover:border-amber-400">401</button>
+            <button type="button" data-score="501" class="score-btn py-2 text-sm font-bold rounded-xl border border-slate-700 bg-slate-800 text-slate-300 hover:border-amber-400">501</button>
+          </div>
+        </div>
+
+        <!-- Player Count -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Oyuncu Sayısı (2 - 6 Kişi)</label>
+          <div id="playerCountContainer" class="grid grid-cols-5 gap-2 w-full">
+            <!-- 2 to 6 -->
+          </div>
+        </div>
+
+        <!-- Player Names Inputs -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Oyuncu İsimleri</label>
+          <div id="playerNamesInputs" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-48 overflow-y-auto pr-1">
+            <!-- Inputs dynamically populated -->
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-6 pt-4 border-t border-slate-800 flex justify-end gap-2">
+        <button id="btnCancelSetup" class="px-4 py-2 rounded-xl text-sm font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300">
+          Vazgeç
+        </button>
+        <button id="btnStartGame" class="px-5 py-2 rounded-xl text-sm font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-lg shadow-amber-500/25">
+          Oyunu Başlat
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Match History Modal -->
+  <div id="historyModal" class="hidden fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 w-full max-w-lg rounded-2xl shadow-2xl p-6 overflow-hidden flex flex-col max-h-[85vh]">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <h3 class="text-lg font-bold text-white flex items-center gap-2">
+          <svg class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          <span>Tablette Kayıtlı Maç Geçmişi</span>
+        </h3>
+        <button id="btnCloseHistory" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- History List -->
+      <div id="historyListContainer" class="mt-4 space-y-3 overflow-y-auto flex-grow pr-1">
+        <!-- Rendered via JS -->
+      </div>
+
+      <div class="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between">
+        <button id="btnClearHistory" class="px-3 py-1.5 text-xs font-semibold text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-lg transition border border-rose-500/20">
+          Geçmişi Temizle
+        </button>
+        <button id="btnCloseHistoryBtn" class="px-4 py-2 rounded-xl text-sm font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300">
+          Kapat
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- iOS / iPadOS Install Instructions Modal -->
+  <div id="iosInstallModal" class="hidden fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 w-full max-w-sm rounded-2xl shadow-2xl p-6 text-center">
+      <div class="w-14 h-14 mx-auto mb-3 rounded-2xl bg-amber-500/10 flex items-center justify-center text-amber-400">
+        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+        </svg>
+      </div>
+      <h3 class="text-base font-bold text-white mb-2">iPad / iPhone'a Yükleyin</h3>
+      <p class="text-xs text-slate-300 mb-4 text-left leading-relaxed">
+        Dart Masters'ı tabletinize tam ekran uygulama olarak yüklemek için:
+        <br><br>
+        1. Safari'nin altındaki veya üstündeki <strong>Paylaş (<svg class="w-4 h-4 inline text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>)</strong> butonuna dokunun.<br>
+        2. Menüden <strong>"Ana Ekrana Ekle"</strong> seçeneğini seçin.
+      </p>
+      <button id="btnCloseIosInstall" class="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs transition">
+        Anladım
+      </button>
+    </div>
+  </div>
+
+  <!-- Victory Modal -->
+  <div id="victoryModal" class="hidden fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-gradient-to-b from-slate-900 to-slate-950 border-2 border-amber-500 max-w-md w-full rounded-3xl p-6 text-center shadow-2xl relative overflow-hidden">
+      <div class="w-20 h-20 mx-auto rounded-full bg-amber-500/20 flex items-center justify-center mb-4 text-amber-400 text-4xl shadow-inner">
+        🏆
+      </div>
+      <span class="text-xs font-extrabold uppercase tracking-widest text-amber-400">Tebrikler! Kazanan Belli Oldu</span>
+      <h2 id="winnerName" class="text-3xl font-black text-white mt-1">Oyuncu 1</h2>
+      <p id="winnerStats" class="text-sm text-slate-300 mt-2 font-medium">Tur 8 içinde 301 puanı tamamladı!</p>
+
+      <div class="mt-6 flex flex-col sm:flex-row justify-center gap-3">
+        <button id="btnPlayAgain" class="flex-1 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-extrabold text-sm shadow-xl shadow-amber-500/30 hover:brightness-110 active:scale-95 transition">
+          Yeniden Oyna
+        </button>
+        <button id="btnViewHistoryFromVictory" class="px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs border border-slate-700 transition">
+          Maç Geçmişi
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="border-t border-slate-800/80 bg-slate-950 text-slate-500 text-xs py-3 px-4 text-center flex flex-wrap items-center justify-between gap-2 max-w-7xl mx-auto w-full">
+    <span>X01 Dart Skor Tahtası &copy; 2026. Çevrimdışı PWA & Tablet Desteği.</span>
+    <span class="text-[11px] text-slate-600">Her atış otomatik olarak cihazınıza kaydedilir.</span>
+  </footer>
+
+  <script>
+    /* =========================================================================
+       DART CONSTANTS & ENGINE
+       Standard sector order clockwise starting from top (12 o'clock)
+       ========================================================================= */
+    const SECTORS_ORDER = [20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5];
+
+    const RADIUS = {
+      DOUBLE_BULL: 9,      // 50 pts
+      SINGLE_BULL: 22,     // 25 pts
+      INNER_SINGLE_MIN: 22,
+      INNER_SINGLE_MAX: 96,
+      TRIPLE_MIN: 96,
+      TRIPLE_MAX: 109,
+      OUTER_SINGLE_MIN: 109,
+      OUTER_SINGLE_MAX: 160,
+      DOUBLE_MIN: 160,
+      DOUBLE_MAX: 172
+    };
+
+    const COLORS = {
+      RED: '#dc2626',
+      GREEN: '#16a34a',
+      CREAM: '#fef3c7',
+      BLACK: '#18181b',
+      WIRE: '#475569'
+    };
+
+    // Storage Keys
+    const STORAGE_KEYS = {
+      ACTIVE_GAME: 'dart_masters_active_game_v1',
+      HISTORY: 'dart_masters_match_history_v1',
+      PREFS: 'dart_masters_prefs_v1'
+    };
+
+    // Game State
+    let gameState = {
+      targetScore: 301,
+      players: [],
+      activePlayerIndex: 0,
+      currentRound: 1,
+      currentTurnDarts: [], // array of { text, points, mult, val, coords: {x,y} }
+      isGameOver: false,
+      startTime: Date.now()
+    };
+
+    // DOM Elements Cache
+    const activePlayerCard = document.getElementById('activePlayerCard');
+    const activePlayerName = document.getElementById('activePlayerName');
+    const activePlayerScore = document.getElementById('activePlayerScore');
+    const turnRoundBadge = document.getElementById('turnRoundBadge');
+    const currentTurnSum = document.getElementById('currentTurnSum');
+    const playersListContainer = document.getElementById('playersListContainer');
+    const gameInfoBadge = document.getElementById('gameInfoBadge');
+    const turnMessage = document.getElementById('turnMessage');
+    const saveBadge = document.getElementById('saveBadge');
+    const dartboardSvg = document.getElementById('dartboardSvg');
+    const sectorsGroup = document.getElementById('sectorsGroup');
+    const numbersGroup = document.getElementById('numbersGroup');
+    const dartPinsGroup = document.getElementById('dartPinsGroup');
+    
+    // Modal Elements
+    const setupModal = document.getElementById('setupModal');
+    const historyModal = document.getElementById('historyModal');
+    const iosInstallModal = document.getElementById('iosInstallModal');
+    const victoryModal = document.getElementById('victoryModal');
+    const winnerName = document.getElementById('winnerName');
+    const winnerStats = document.getElementById('winnerStats');
+    const historyListContainer = document.getElementById('historyListContainer');
+    
+    // Buttons
+    const btnOpenSetup = document.getElementById('btnOpenSetup');
+    const btnCloseSetup = document.getElementById('btnCloseSetup');
+    const btnCancelSetup = document.getElementById('btnCancelSetup');
+    const btnStartGame = document.getElementById('btnStartGame');
+    const btnResetCurrent = document.getElementById('btnResetCurrent');
+    const btnPlayAgain = document.getElementById('btnPlayAgain');
+    const btnViewHistoryFromVictory = document.getElementById('btnViewHistoryFromVictory');
+    const btnUndoDart = document.getElementById('btnUndoDart');
+    const btnMissDart = document.getElementById('btnMissDart');
+    const btnPassTurn = document.getElementById('btnPassTurn');
+    const btnOpenHistory = document.getElementById('btnOpenHistory');
+    const btnCloseHistory = document.getElementById('btnCloseHistory');
+    const btnCloseHistoryBtn = document.getElementById('btnCloseHistoryBtn');
+    const btnClearHistory = document.getElementById('btnClearHistory');
+    const btnInstallPwa = document.getElementById('btnInstallPwa');
+    const btnCloseIosInstall = document.getElementById('btnCloseIosInstall');
+    const btnToggleFullscreen = document.getElementById('btnToggleFullscreen');
+    const playerCountContainer = document.getElementById('playerCountContainer');
+    const playerNamesInputs = document.getElementById('playerNamesInputs');
+
+    let tempPlayerCount = 4;
+    let tempTargetScore = 301;
+    let deferredInstallPrompt = null;
+
+    /* =========================================================================
+       INITIALIZATION
+       ========================================================================= */
+    function init() {
+      buildDartboardSVG();
+      setupEventListeners();
+      setupPlayerConfigUI();
+      setupPWAAndServiceWorker();
+
+      // Check if there is an active saved game in localStorage
+      const hasRestored = loadGameState();
+      if (!hasRestored) {
+        // Start default fresh game
+        startNewGame(301, [
+          { name: "1. Oyuncu" },
+          { name: "2. Oyuncu" },
+          { name: "3. Oyuncu" },
+          { name: "4. Oyuncu" }
+        ]);
+      }
+    }
+
+    /* =========================================================================
+       LOCAL STORAGE & PERSISTENCE (TABLET KAYIT SİSTEMİ)
+       ========================================================================= */
+    function saveGameState() {
+      try {
+        localStorage.setItem(STORAGE_KEYS.ACTIVE_GAME, JSON.stringify(gameState));
+        flashSaveBadge();
+      } catch (e) {
+        console.error("Oyun kaydedilemedi:", e);
+      }
+    }
+
+    function loadGameState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEYS.ACTIVE_GAME);
+        if (!raw) return false;
+
+        const saved = JSON.parse(raw);
+        if (saved && Array.isArray(saved.players) && saved.players.length > 0 && !saved.isGameOver) {
+          gameState = saved;
+          gameInfoBadge.textContent = `${gameState.targetScore} Oyunu`;
+          redrawAllPins();
+          updateUI();
+          showTurnMessage("Kayıtlı oyun yüklendi. Kaldığınız yerden devam edebilirsiniz.", "emerald");
+          return true;
+        }
+      } catch (e) {
+        console.error("Kayıtlı oyun okunamadı:", e);
+      }
+      return false;
+    }
+
+    function clearActiveGameState() {
+      try {
+        localStorage.removeItem(STORAGE_KEYS.ACTIVE_GAME);
+      } catch (e) {
+        console.error("Aktif oyun kaydı silinemedi:", e);
+      }
+    }
+
+    function saveGameToHistory(winner) {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEYS.HISTORY);
+        const history = raw ? JSON.parse(raw) : [];
+
+        const record = {
+          id: Date.now(),
+          date: new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+          targetScore: gameState.targetScore,
+          winnerName: winner.name,
+          rounds: gameState.currentRound,
+          players: gameState.players.map(p => ({
+            name: p.name,
+            remainingScore: p.remainingScore,
+            turnsCount: p.turnsCount
+          }))
+        };
+
+        // Keep last 40 games
+        history.unshift(record);
+        if (history.length > 40) history.pop();
+
+        localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(history));
+      } catch (e) {
+        console.error("Geçmiş kaydedilemedi:", e);
+      }
+    }
+
+    function renderHistory() {
+      historyListContainer.innerHTML = '';
+      try {
+        const raw = localStorage.getItem(STORAGE_KEYS.HISTORY);
+        const history = raw ? JSON.parse(raw) : [];
+
+        if (history.length === 0) {
+          historyListContainer.innerHTML = `
+            <div class="text-center py-8 text-slate-500">
+              <svg class="w-10 h-10 mx-auto mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+              <p class="text-sm font-medium">Henüz kayıtlı tamamlanmış bir maç yok.</p>
+              <p class="text-xs text-slate-600 mt-1">Oyunlar bittiğinde burada listelenecektir.</p>
+            </div>
+          `;
+          return;
+        }
+
+        history.forEach((match) => {
+          const item = document.createElement('div');
+          item.className = 'bg-slate-950/60 border border-slate-800 hover:border-slate-700 rounded-xl p-3.5 transition flex flex-col gap-2';
+
+          const playersSummary = match.players
+            .map(p => `${p.name} (${p.remainingScore}p)`)
+            .join(', ');
+
+          item.innerHTML = `
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  ${match.targetScore} X01
+                </span>
+                <span class="text-xs text-slate-400 font-medium">${match.date}</span>
+              </div>
+              <span class="text-xs text-slate-400 font-semibold">${match.rounds}. Turda Bitti</span>
+            </div>
+
+            <div class="flex items-baseline justify-between mt-1">
+              <div class="flex items-center gap-1.5 text-emerald-400 font-bold text-sm">
+                <span>🏆 Şampiyon:</span>
+                <span class="text-white">${match.winnerName}</span>
+              </div>
+            </div>
+
+            <div class="text-[11px] text-slate-400 truncate mt-0.5">
+              Oyuncular: <span class="text-slate-300">${playersSummary}</span>
+            </div>
+          `;
+          historyListContainer.appendChild(item);
+        });
+      } catch (e) {
+        historyListContainer.innerHTML = `<div class="text-rose-400 text-xs text-center py-4">Geçmiş yüklenirken bir hata oluştu.</div>`;
+      }
+    }
+
+    function flashSaveBadge() {
+      if (!saveBadge) return;
+      saveBadge.classList.add('bg-emerald-500/30');
+      setTimeout(() => {
+        saveBadge.classList.remove('bg-emerald-500/30');
+      }, 400);
+    }
+
+    /* =========================================================================
+       SVG DARTBOARD GENERATOR
+       ========================================================================= */
+    function buildDartboardSVG() {
+      sectorsGroup.innerHTML = '';
+      numbersGroup.innerHTML = '';
+      const stepAngle = 360 / 20;
+
+      SECTORS_ORDER.forEach((val, idx) => {
+        const startDeg = -90 - 9 + (idx * stepAngle);
+        const endDeg = startDeg + stepAngle;
+        const isOdd = idx % 2 === 1;
+
+        const primaryBedColor = isOdd ? COLORS.CREAM : COLORS.BLACK;
+        const ringColor = isOdd ? COLORS.GREEN : COLORS.RED;
+
+        // 1. Inner Single Bed
+        createSectorPath(RADIUS.INNER_SINGLE_MIN, RADIUS.INNER_SINGLE_MAX, startDeg, endDeg, primaryBedColor, val, 1, `S${val} (${val})`);
+
+        // 2. Triple Ring
+        createSectorPath(RADIUS.TRIPLE_MIN, RADIUS.TRIPLE_MAX, startDeg, endDeg, ringColor, val, 3, `T${val} (${val * 3})`);
+
+        // 3. Outer Single Bed
+        createSectorPath(RADIUS.OUTER_SINGLE_MIN, RADIUS.OUTER_SINGLE_MAX, startDeg, endDeg, primaryBedColor, val, 1, `S${val} (${val})`);
+
+        // 4. Double Ring
+        createSectorPath(RADIUS.DOUBLE_MIN, RADIUS.DOUBLE_MAX, startDeg, endDeg, ringColor, val, 2, `D${val} (${val * 2})`);
+
+        // Add Number Text around perimeter
+        const midDeg = (startDeg + endDeg) / 2;
+        const midRad = (midDeg * Math.PI) / 180;
+        const textRadius = 198;
+        const tx = textRadius * Math.cos(midRad);
+        const ty = textRadius * Math.sin(midRad);
+
+        const textEl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        textEl.setAttribute('x', tx);
+        textEl.setAttribute('y', ty + 5);
+        textEl.setAttribute('text-anchor', 'middle');
+        textEl.setAttribute('fill', '#f8fafc');
+        textEl.setAttribute('font-size', '17');
+        textEl.setAttribute('font-weight', '800');
+        textEl.setAttribute('class', 'font-digital select-none');
+        textEl.textContent = val;
+        numbersGroup.appendChild(textEl);
+      });
+
+      // 5. Outer Bull (Single Bull, 25 points, green)
+      const outerBull = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      outerBull.setAttribute('cx', 0);
+      outerBull.setAttribute('cy', 0);
+      outerBull.setAttribute('r', RADIUS.SINGLE_BULL);
+      outerBull.setAttribute('fill', COLORS.GREEN);
+      outerBull.setAttribute('class', 'dart-sector');
+      outerBull.dataset.points = 25;
+      outerBull.dataset.multiplier = 1;
+      outerBull.dataset.label = "Bull (25)";
+      outerBull.addEventListener('click', (e) => handleSectorClick(25, 1, "Bull (25)", e));
+      sectorsGroup.appendChild(outerBull);
+
+      // 6. Inner Bull (Double Bull, 50 points, red)
+      const innerBull = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      innerBull.setAttribute('cx', 0);
+      innerBull.setAttribute('cy', 0);
+      innerBull.setAttribute('r', RADIUS.DOUBLE_BULL);
+      innerBull.setAttribute('fill', COLORS.RED);
+      innerBull.setAttribute('class', 'dart-sector');
+      innerBull.dataset.points = 50;
+      innerBull.dataset.multiplier = 2;
+      innerBull.dataset.label = "D-Bull (50)";
+      innerBull.addEventListener('click', (e) => handleSectorClick(50, 2, "D-Bull (50)", e));
+      sectorsGroup.appendChild(innerBull);
+    }
+
+    function createSectorPath(rInner, rOuter, startAngleDeg, endAngleDeg, color, sectorValue, multiplier, label) {
+      const p1 = polarToCartesian(rOuter, startAngleDeg);
+      const p2 = polarToCartesian(rOuter, endAngleDeg);
+      const p3 = polarToCartesian(rInner, endAngleDeg);
+      const p4 = polarToCartesian(rInner, startAngleDeg);
+
+      const largeArc = (endAngleDeg - startAngleDeg) <= 180 ? 0 : 1;
+
+      const pathData = [
+        `M ${p1.x} ${p1.y}`,
+        `A ${rOuter} ${rOuter} 0 ${largeArc} 1 ${p2.x} ${p2.y}`,
+        `L ${p3.x} ${p3.y}`,
+        `A ${rInner} ${rInner} 0 ${largeArc} 0 ${p4.x} ${p4.y}`,
+        'Z'
+      ].join(' ');
+
+      const pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      pathEl.setAttribute('d', pathData);
+      pathEl.setAttribute('fill', color);
+      pathEl.setAttribute('class', 'dart-sector');
+      pathEl.dataset.points = sectorValue * multiplier;
+      pathEl.dataset.multiplier = multiplier;
+      pathEl.dataset.baseValue = sectorValue;
+      pathEl.dataset.label = label;
+
+      pathEl.addEventListener('click', (e) => {
+        handleSectorClick(sectorValue * multiplier, multiplier, label, e);
+      });
+
+      sectorsGroup.appendChild(pathEl);
+    }
+
+    function polarToCartesian(radius, angleInDegrees) {
+      const radians = (angleInDegrees * Math.PI) / 180.0;
+      return {
+        x: radius * Math.cos(radians),
+        y: radius * Math.sin(radians)
+      };
+    }
+
+    /* =========================================================================
+       EVENT LISTENERS & SETUP
+       ========================================================================= */
+    function setupEventListeners() {
+      // Setup Modal Triggers
+      btnOpenSetup.addEventListener('click', () => {
+        setupModal.classList.remove('hidden');
+      });
+      btnCloseSetup.addEventListener('click', () => setupModal.classList.add('hidden'));
+      btnCancelSetup.addEventListener('click', () => setupModal.classList.add('hidden'));
+
+      // History Modal Triggers
+      btnOpenHistory.addEventListener('click', () => {
+        renderHistory();
+        historyModal.classList.remove('hidden');
+      });
+      btnCloseHistory.addEventListener('click', () => historyModal.classList.add('hidden'));
+      btnCloseHistoryBtn.addEventListener('click', () => historyModal.classList.add('hidden'));
+      btnViewHistoryFromVictory.addEventListener('click', () => {
+        victoryModal.classList.add('hidden');
+        renderHistory();
+        historyModal.classList.remove('hidden');
+      });
+
+      btnClearHistory.addEventListener('click', () => {
+        if (confirm("Kayıtlı tüm maç geçmişi silinecektir. Emin misiniz?")) {
+          localStorage.removeItem(STORAGE_KEYS.HISTORY);
+          renderHistory();
+        }
+      });
+
+      // Score options in setup
+      document.querySelectorAll('.score-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.score-btn').forEach(b => {
+            b.classList.remove('border-2', 'border-amber-500', 'bg-amber-500/20', 'text-amber-300');
+            b.classList.add('border-slate-700', 'bg-slate-800', 'text-slate-300');
+          });
+          btn.classList.add('border-2', 'border-amber-500', 'bg-amber-500/20', 'text-amber-300');
+          btn.classList.remove('border-slate-700', 'bg-slate-800', 'text-slate-300');
+          tempTargetScore = parseInt(btn.dataset.score);
+        });
+      });
+
+      // Start Game Button in modal
+      btnStartGame.addEventListener('click', () => {
+        const playerInputs = document.querySelectorAll('.player-name-input');
+        const configuredPlayers = [];
+        playerInputs.forEach((inp, idx) => {
+          const val = inp.value.trim();
+          configuredPlayers.push({
+            name: val.length > 0 ? val : `${idx + 1}. Oyuncu`
+          });
+        });
+        startNewGame(tempTargetScore, configuredPlayers);
+        setupModal.classList.add('hidden');
+      });
+
+      // Reset Current Game
+      btnResetCurrent.addEventListener('click', () => {
+        if (confirm("Mevcut oyun sıfırlanacak. Emin misiniz?")) {
+          startNewGame(gameState.targetScore, gameState.players.map(p => ({ name: p.name })));
+        }
+      });
+
+      // Play Again after Victory
+      btnPlayAgain.addEventListener('click', () => {
+        victoryModal.classList.add('hidden');
+        startNewGame(gameState.targetScore, gameState.players.map(p => ({ name: p.name })));
+      });
+
+      // In-Game Action Buttons
+      btnUndoDart.addEventListener('click', undoLastDart);
+      btnMissDart.addEventListener('click', () => handleMissDart());
+      btnPassTurn.addEventListener('click', finishTurn);
+
+      // Fullscreen Toggle
+      btnToggleFullscreen.addEventListener('click', toggleFullscreen);
+
+      // iOS Guide Close
+      btnCloseIosInstall.addEventListener('click', () => iosInstallModal.classList.add('hidden'));
+    }
+
+    function setupPlayerConfigUI() {
+      playerCountContainer.innerHTML = '';
+      for (let i = 2; i <= 6; i++) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = `${i} Oyuncu`;
+        btn.className = `py-2 text-xs font-bold rounded-xl border transition ${
+          i === tempPlayerCount
+            ? 'border-2 border-amber-500 bg-amber-500/20 text-amber-300'
+            : 'border-slate-700 bg-slate-800 text-slate-300 hover:border-slate-500'
+        }`;
+        btn.addEventListener('click', () => {
+          tempPlayerCount = i;
+          setupPlayerConfigUI();
+        });
+        playerCountContainer.appendChild(btn);
+      }
+
+      // Generate Name Inputs
+      playerNamesInputs.innerHTML = '';
+      for (let i = 1; i <= tempPlayerCount; i++) {
+        const div = document.createElement('div');
+        div.className = 'flex items-center gap-2 bg-slate-800/80 p-2 rounded-xl border border-slate-700';
+        div.innerHTML = `
+          <span class="text-xs font-bold text-amber-400 w-5 text-center">${i}</span>
+          <input type="text" class="player-name-input bg-transparent border-none text-slate-100 text-sm focus:outline-none w-full"
+            value="Oyuncu ${i}" placeholder="Oyuncu Adı">
+        `;
+        playerNamesInputs.appendChild(div);
+      }
+    }
+
+    /* =========================================================================
+       PWA & SERVICE WORKER SETUP
+       ========================================================================= */
+    function setupPWAAndServiceWorker() {
+      // 1. Register Service Worker
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('./sw.js')
+            .then(reg => {
+              console.log('[PWA] Service Worker registered:', reg.scope);
+            })
+            .catch(err => {
+              console.warn('[PWA] Service Worker registration failed:', err);
+            });
+        });
+      }
+
+      // 2. Handle beforeinstallprompt for Android / Chrome / Edge tablets
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredInstallPrompt = e;
+        btnInstallPwa.classList.remove('hidden');
+      });
+
+      // 3. Install button click handler
+      btnInstallPwa.addEventListener('click', async () => {
+        if (deferredInstallPrompt) {
+          deferredInstallPrompt.prompt();
+          const { outcome } = await deferredInstallPrompt.userChoice;
+          console.log(`[PWA] Install prompt outcome: ${outcome}`);
+          deferredInstallPrompt = null;
+          btnInstallPwa.classList.add('hidden');
+        } else {
+          // Check for iOS / iPadOS
+          const isIOS = /ipad|iphone|ipod/.test(navigator.userAgent.toLowerCase()) && !window.MSStream;
+          if (isIOS) {
+            iosInstallModal.classList.remove('hidden');
+          } else {
+            alert("Dart Masters'ı yüklemek için tarayıcınızın menüsünden 'Uygulamayı Yükle' veya 'Ana Ekrana Ekle' seçeneğini seçebilirsiniz.");
+          }
+        }
+      });
+
+      // 4. App Installed listener
+      window.addEventListener('appinstalled', () => {
+        console.log('[PWA] Dart Masters was installed successfully!');
+        btnInstallPwa.classList.add('hidden');
+        showTurnMessage("Dart Masters tabletinize başarıyla yüklendi!", "emerald");
+      });
+
+      // 5. If running in standalone display mode (already installed as PWA)
+      if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
+        btnInstallPwa.classList.add('hidden');
+      } else {
+        // If on iPad, display button to guide user
+        const isIOS = /ipad|iphone|ipod/.test(navigator.userAgent.toLowerCase()) && !window.MSStream;
+        if (isIOS) {
+          btnInstallPwa.classList.remove('hidden');
+        }
+      }
+    }
+
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen();
+        }
+      }
+    }
+
+    /* =========================================================================
+       GAME CONTROLLER & LOGIC
+       ========================================================================= */
+    function startNewGame(targetScore, playerList) {
+      gameState.targetScore = targetScore;
+      gameState.isGameOver = false;
+      gameState.activePlayerIndex = 0;
+      gameState.currentRound = 1;
+      gameState.currentTurnDarts = [];
+      gameState.startTime = Date.now();
+
+      gameState.players = playerList.map((p, idx) => ({
+        id: idx + 1,
+        name: p.name,
+        remainingScore: targetScore,
+        turnStartScore: targetScore,
+        lastTurnScore: 0,
+        turnsCount: 0,
+        history: []
+      }));
+
+      gameInfoBadge.textContent = `${targetScore} Oyunu`;
+      hideTurnMessage();
+      clearDartPins();
+      updateUI();
+      saveGameState();
+    }
+
+    function handleSectorClick(points, multiplier, label, event) {
+      if (gameState.isGameOver) return;
+      if (gameState.currentTurnDarts.length >= 3) {
+        showTurnMessage("Bu turda 3 atış hakkı tamamlandı! 'Turu Bitir' butonuna basın.", "amber");
+        return;
+      }
+
+      let coords = null;
+      if (event) {
+        const svgRect = dartboardSvg.getBoundingClientRect();
+        const clientX = event.clientX;
+        const clientY = event.clientY;
+        const svgX = ((clientX - svgRect.left) / svgRect.width) * 480 - 240;
+        const svgY = ((clientY - svgRect.top) / svgRect.height) * 480 - 240;
+        coords = { x: svgX, y: svgY };
+      }
+
+      registerDart(points, multiplier, label, coords);
+    }
+
+    function handleMissDart() {
+      if (gameState.isGameOver) return;
+      if (gameState.currentTurnDarts.length >= 3) {
+        showTurnMessage("Bu turda 3 atış hakkı tamamlandı!", "amber");
+        return;
+      }
+      registerDart(0, 0, "Miss (0)", null);
+    }
+
+    function registerDart(points, multiplier, label, coords) {
+      const activePlayer = gameState.players[gameState.activePlayerIndex];
+      const dartRecord = {
+        points,
+        multiplier,
+        label,
+        coords
+      };
+
+      gameState.currentTurnDarts.push(dartRecord);
+
+      if (coords) {
+        renderDartPin(coords.x, coords.y, gameState.currentTurnDarts.length);
+      }
+
+      const currentTurnTotal = gameState.currentTurnDarts.reduce((acc, d) => acc + d.points, 0);
+      const projectedScore = activePlayer.turnStartScore - currentTurnTotal;
+
+      if (projectedScore === 0) {
+        // Instantly Wins!
+        activePlayer.remainingScore = 0;
+        updateUI();
+        triggerVictory(activePlayer);
+        return;
+      } else if (projectedScore < 0 || projectedScore === 1) {
+        // Bust!
+        updateUI();
+        saveGameState();
+        showTurnMessage(`BUST! Puan 0'ın altına indi veya 1 kaldı. Tur sıfırlanıyor.`, "rose");
+        setTimeout(() => {
+          handleBustTurn();
+        }, 1200);
+        return;
+      }
+
+      updateUI();
+      saveGameState();
+
+      if (gameState.currentTurnDarts.length === 3) {
+        showTurnMessage("3 atış tamamlandı. 'Turu Bitir' butonuna basarak sırayı devredin.", "emerald");
+      }
+    }
+
+    function undoLastDart() {
+      if (gameState.currentTurnDarts.length === 0 || gameState.isGameOver) return;
+      gameState.currentTurnDarts.pop();
+      hideTurnMessage();
+      redrawAllPins();
+      updateUI();
+      saveGameState();
+    }
+
+    function handleBustTurn() {
+      const activePlayer = gameState.players[gameState.activePlayerIndex];
+      activePlayer.remainingScore = activePlayer.turnStartScore;
+      activePlayer.lastTurnScore = 0;
+      activePlayer.history.push({
+        round: gameState.currentRound,
+        scoreScored: 0,
+        isBust: true,
+        darts: [...gameState.currentTurnDarts]
+      });
+
+      advanceToNextPlayer();
+    }
+
+    function finishTurn() {
+      if (gameState.isGameOver) return;
+      const activePlayer = gameState.players[gameState.activePlayerIndex];
+      const turnScore = gameState.currentTurnDarts.reduce((acc, d) => acc + d.points, 0);
+      const finalScore = activePlayer.turnStartScore - turnScore;
+
+      if (finalScore === 0) {
+        activePlayer.remainingScore = 0;
+        triggerVictory(activePlayer);
+        return;
+      } else if (finalScore < 0 || finalScore === 1) {
+        handleBustTurn();
+        return;
+      }
+
+      activePlayer.remainingScore = finalScore;
+      activePlayer.turnStartScore = finalScore;
+      activePlayer.lastTurnScore = turnScore;
+      activePlayer.turnsCount++;
+      activePlayer.history.push({
+        round: gameState.currentRound,
+        scoreScored: turnScore,
+        isBust: false,
+        darts: [...gameState.currentTurnDarts]
+      });
+
+      advanceToNextPlayer();
+    }
+
+    function advanceToNextPlayer() {
+      gameState.currentTurnDarts = [];
+      clearDartPins();
+      hideTurnMessage();
+
+      gameState.activePlayerIndex++;
+      if (gameState.activePlayerIndex >= gameState.players.length) {
+        gameState.activePlayerIndex = 0;
+        gameState.currentRound++;
+      }
+
+      gameState.players[gameState.activePlayerIndex].turnStartScore =
+        gameState.players[gameState.activePlayerIndex].remainingScore;
+
+      updateUI();
+      saveGameState();
+    }
+
+    function triggerVictory(winner) {
+      gameState.isGameOver = true;
+      winnerName.textContent = winner.name;
+      winnerStats.textContent = `Toplam ${gameState.currentRound} turda ${gameState.targetScore} puanı tamamlayarak şampiyon oldu!`;
+      victoryModal.classList.remove('hidden');
+
+      // Save match to persistent history and clear active game
+      saveGameToHistory(winner);
+      clearActiveGameState();
+
+      // Trigger Confetti
+      try {
+        confetti({
+          particleCount: 140,
+          spread: 80,
+          origin: { y: 0.6 }
+        });
+      } catch (e) {}
+    }
+
+    /* =========================================================================
+       UI RENDERING & VISUAL PIN MARKERS
+       ========================================================================= */
+    function renderDartPin(x, y, dartNumber) {
+      const pinGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      pinGroup.setAttribute('class', 'dart-marker');
+      pinGroup.setAttribute('transform', `translate(${x}, ${y})`);
+
+      const pinHead = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      pinHead.setAttribute('r', '8');
+      pinHead.setAttribute('fill', '#f59e0b');
+      pinHead.setAttribute('stroke', '#000');
+      pinHead.setAttribute('stroke-width', '1.5');
+      pinHead.setAttribute('filter', 'url(#shadow)');
+
+      const pinText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      pinText.setAttribute('y', '3');
+      pinText.setAttribute('text-anchor', 'middle');
+      pinText.setAttribute('fill', '#000');
+      pinText.setAttribute('font-size', '9');
+      pinText.setAttribute('font-weight', '900');
+      pinText.textContent = dartNumber;
+
+      pinGroup.appendChild(pinHead);
+      pinGroup.appendChild(pinText);
+      dartPinsGroup.appendChild(pinGroup);
+    }
+
+    function redrawAllPins() {
+      clearDartPins();
+      if (!gameState.currentTurnDarts) return;
+      gameState.currentTurnDarts.forEach((dart, idx) => {
+        if (dart && dart.coords) {
+          renderDartPin(dart.coords.x, dart.coords.y, idx + 1);
+        }
+      });
+    }
+
+    function clearDartPins() {
+      dartPinsGroup.innerHTML = '';
+    }
+
+    function showTurnMessage(msg, type = "amber") {
+      turnMessage.classList.remove('hidden', 'bg-amber-500/10', 'text-amber-300', 'border-amber-500/30', 'bg-rose-500/10', 'text-rose-300', 'border-rose-500/30', 'bg-emerald-500/10', 'text-emerald-300', 'border-emerald-500/30');
+      if (type === "rose") {
+        turnMessage.classList.add('bg-rose-500/10', 'text-rose-300', 'border-rose-500/30');
+      } else if (type === "emerald") {
+        turnMessage.classList.add('bg-emerald-500/10', 'text-emerald-300', 'border-emerald-500/30');
+      } else {
+        turnMessage.classList.add('bg-amber-500/10', 'text-amber-300', 'border-amber-500/30');
+      }
+      turnMessage.textContent = msg;
+    }
+
+    function hideTurnMessage() {
+      turnMessage.classList.add('hidden');
+    }
+
+    function updateUI() {
+      const activePlayer = gameState.players[gameState.activePlayerIndex];
+      if (!activePlayer) return;
+
+      activePlayerName.textContent = activePlayer.name;
+      turnRoundBadge.textContent = `Tur ${gameState.currentRound}`;
+
+      const turnSum = (gameState.currentTurnDarts || []).reduce((acc, d) => acc + d.points, 0);
+      currentTurnSum.textContent = turnSum;
+
+      const projectedRemaining = Math.max(0, activePlayer.turnStartScore - turnSum);
+      activePlayerScore.textContent = projectedRemaining;
+
+      // Update 3 Dart Slots
+      for (let i = 0; i < 3; i++) {
+        const slotEl = document.getElementById(`slotDart${i}`);
+        const labelEl = slotEl.querySelector('.dart-label');
+        const subEl = slotEl.querySelector('.dart-sub');
+
+        if (gameState.currentTurnDarts && i < gameState.currentTurnDarts.length) {
+          const dart = gameState.currentTurnDarts[i];
+          labelEl.textContent = dart.label.split(' ')[0];
+          subEl.textContent = `${dart.points} puan`;
+          slotEl.classList.remove('bg-slate-950/60', 'border-slate-700');
+          slotEl.classList.add('bg-amber-500/20', 'border-amber-500/60');
+          labelEl.classList.add('text-amber-400');
+        } else {
+          labelEl.textContent = '-';
+          subEl.textContent = '0 p';
+          slotEl.classList.add('bg-slate-950/60', 'border-slate-700');
+          slotEl.classList.remove('bg-amber-500/20', 'border-amber-500/60');
+          labelEl.classList.remove('text-amber-400');
+        }
+      }
+
+      btnUndoDart.disabled = !gameState.currentTurnDarts || gameState.currentTurnDarts.length === 0;
+
+      renderPlayersList();
+    }
+
+    function renderPlayersList() {
+      playersListContainer.innerHTML = '';
+
+      gameState.players.forEach((player, idx) => {
+        const isActive = idx === gameState.activePlayerIndex;
+        const div = document.createElement('div');
+        div.className = `flex items-center justify-between p-3 rounded-xl transition duration-150 border ${
+          isActive
+            ? 'bg-amber-500/10 border-amber-500/50 shadow-md ring-1 ring-amber-500/30'
+            : 'bg-slate-950/40 border-slate-800 hover:border-slate-700'
+        }`;
+
+        div.innerHTML = `
+          <div class="flex items-center gap-3 min-w-0">
+            <span class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-black ${
+              isActive ? 'bg-amber-500 text-slate-950 font-extrabold' : 'bg-slate-800 text-slate-400'
+            }">
+              ${idx + 1}
+            </span>
+            <div class="truncate">
+              <span class="font-bold text-sm text-slate-200 block truncate ${isActive ? 'text-amber-300' : ''}">
+                ${player.name}
+              </span>
+              <span class="text-[11px] text-slate-500 font-medium">
+                Son Tur: <strong class="text-slate-400">${player.lastTurnScore}</strong> puan
+              </span>
+            </div>
+          </div>
+
+          <div class="text-right">
+            <span class="text-2xl font-black font-digital ${
+              isActive ? 'text-amber-400' : 'text-slate-300'
+            }">
+              ${player.remainingScore}
+            </span>
+          </div>
+        `;
+
+        playersListContainer.appendChild(div);
+      });
+    }
+
+    // Start everything on page load
+    window.onload = function() {
+      init();
+    };
+  </script>
+</body>
+</html>
