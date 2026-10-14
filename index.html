@@ -356,6 +356,12 @@
             <!-- Inputs dynamically populated -->
           </div>
         </div>
+
+        <!-- Random order info notice -->
+        <div class="flex items-center gap-2 text-xs text-amber-300/90 font-medium bg-amber-500/10 p-2.5 rounded-xl border border-amber-500/20">
+          <span class="text-base">🎲</span>
+          <span>Başlayacak oyuncu ve atış sırası kura ile <strong>rastgele</strong> belirlenir.</span>
+        </div>
       </div>
 
       <div class="mt-6 pt-4 border-t border-slate-800 flex justify-end gap-2">
@@ -511,6 +517,15 @@
       } catch (e) {
         console.error("Oyuncu isimleri kaydedilemedi:", e);
       }
+    }
+
+    function shuffleArray(array) {
+      const arr = [...array];
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
     }
 
     // Game State
@@ -909,8 +924,15 @@
           namesToSave.push(finalName);
         });
         savePlayerNames(namesToSave);
-        startNewGame(tempTargetScore, configuredPlayers);
+
+        // Kura çekimi: Başlayacak oyuncu ve atış sırası rastgele belirlensin
+        const randomizedPlayers = shuffleArray(configuredPlayers);
+
+        startNewGame(tempTargetScore, randomizedPlayers);
         setupModal.classList.add('hidden');
+
+        // Kura sonucunu oyunculara bildir
+        showTurnMessage(`🎲 Sıralama kura ile belirlendi! İlk atış: ${randomizedPlayers[0].name}`, "emerald");
       });
 
       // Reset Current Game
@@ -920,10 +942,12 @@
         }
       });
 
-      // Play Again after Victory
+      // Play Again after Victory (yeni maçta da sıra kura ile belirlenir)
       btnPlayAgain.addEventListener('click', () => {
         victoryModal.classList.add('hidden');
-        startNewGame(gameState.targetScore, gameState.players.map(p => ({ name: p.name })));
+        const randomizedPlayers = shuffleArray(gameState.players.map(p => ({ name: p.name })));
+        startNewGame(gameState.targetScore, randomizedPlayers);
+        showTurnMessage(`🎲 Yeni maç kurası çekildi! İlk atış: ${randomizedPlayers[0].name}`, "emerald");
       });
 
       // In-Game Action Buttons

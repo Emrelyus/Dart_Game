@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dart-masters-v3';
+const CACHE_NAME = 'dart-masters-v4';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
