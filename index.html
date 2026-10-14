@@ -259,37 +259,58 @@
         <span class="text-[11px] text-slate-400">Tekil, Çift (Dış x2), Üçlü (İç x3)</span>
       </div>
 
-      <!-- Dartboard SVG Canvas Container -->
-      <div class="w-full max-w-[500px] aspect-square relative select-none flex items-center justify-center">
-        <!-- SVG Dartboard -->
-        <svg id="dartboardSvg" viewBox="-240 -240 480 480" class="w-full h-full drop-shadow-[0_15px_35px_rgba(0,0,0,0.85)] overflow-visible">
-          
-          <defs>
-            <!-- Drop shadow filters -->
-            <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-              <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000000" flood-opacity="0.8"/>
-            </filter>
-            <!-- Radial gradient for board rim -->
-            <radialGradient id="rimGrad" cx="50%" cy="50%" r="50%">
-              <stop offset="85%" stop-color="#0f172a" />
-              <stop offset="97%" stop-color="#1e293b" />
-              <stop offset="100%" stop-color="#090d16" />
-            </radialGradient>
-          </defs>
+      <!-- Dartboard & Right-Side Mini Scores Wrapper -->
+      <div class="w-full flex flex-col md:flex-row items-center justify-center gap-3 sm:gap-4 lg:gap-5">
+        
+        <!-- Dartboard SVG Canvas Container -->
+        <div class="w-full max-w-[470px] aspect-square relative select-none flex items-center justify-center flex-shrink-0">
+          <!-- SVG Dartboard -->
+          <svg id="dartboardSvg" viewBox="-240 -240 480 480" class="w-full h-full drop-shadow-[0_15px_35px_rgba(0,0,0,0.85)] overflow-visible">
+            
+            <defs>
+              <!-- Drop shadow filters -->
+              <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+                <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000000" flood-opacity="0.8"/>
+              </filter>
+              <!-- Radial gradient for board rim -->
+              <radialGradient id="rimGrad" cx="50%" cy="50%" r="50%">
+                <stop offset="85%" stop-color="#0f172a" />
+                <stop offset="97%" stop-color="#1e293b" />
+                <stop offset="100%" stop-color="#090d16" />
+              </radialGradient>
+            </defs>
 
-          <!-- Outer Number Ring Background -->
-          <circle cx="0" cy="0" r="235" fill="url(#rimGrad)" stroke="#334155" stroke-width="4" />
-          <circle cx="0" cy="0" r="203" fill="#0b0f19" stroke="#475569" stroke-width="2" />
+            <!-- Outer Number Ring Background -->
+            <circle cx="0" cy="0" r="235" fill="url(#rimGrad)" stroke="#334155" stroke-width="4" />
+            <circle cx="0" cy="0" r="203" fill="#0b0f19" stroke="#475569" stroke-width="2" />
 
-          <!-- Sectors group (generated dynamically in JS for crisp accuracy) -->
-          <g id="sectorsGroup"></g>
+            <!-- Sectors group (generated dynamically in JS for crisp accuracy) -->
+            <g id="sectorsGroup"></g>
 
-          <!-- Numbers Layer around the perimeter -->
-          <g id="numbersGroup" class="pointer-events-none"></g>
+            <!-- Numbers Layer around the perimeter -->
+            <g id="numbersGroup" class="pointer-events-none"></g>
 
-          <!-- Dynamic hit pins / darts markers placed on the board -->
-          <g id="dartPinsGroup"></g>
-        </svg>
+            <!-- Dynamic hit pins / darts markers placed on the board -->
+            <g id="dartPinsGroup"></g>
+          </svg>
+        </div>
+
+        <!-- Right Side Mini Scores Panel -->
+        <div class="w-full md:w-36 lg:w-40 flex flex-col bg-slate-950/70 border border-slate-800/90 rounded-2xl p-2.5 sm:p-3 shadow-lg">
+          <div class="flex items-center justify-between pb-1.5 mb-2 border-b border-slate-800/80">
+            <span class="text-[10px] sm:text-[11px] font-extrabold tracking-wider text-slate-400 uppercase flex items-center gap-1.5">
+              <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+              Skorlar
+            </span>
+            <span id="sideRoundBadge" class="text-[10px] bg-slate-800 text-amber-300 font-semibold px-1.5 py-0.2 rounded font-digital">T1</span>
+          </div>
+
+          <!-- Mini Scores List (Horizontal on mobile, vertical column on tablet/desktop) -->
+          <div id="sideMiniScoresContainer" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-1 gap-1.5">
+            <!-- Populated via JS -->
+          </div>
+        </div>
+
       </div>
 
       <!-- Board Helper Legends -->
@@ -553,6 +574,8 @@
     const sectorsGroup = document.getElementById('sectorsGroup');
     const numbersGroup = document.getElementById('numbersGroup');
     const dartPinsGroup = document.getElementById('dartPinsGroup');
+    const sideMiniScoresContainer = document.getElementById('sideMiniScoresContainer');
+    const sideRoundBadge = document.getElementById('sideRoundBadge');
     
     // Modal Elements
     const setupModal = document.getElementById('setupModal');
@@ -1376,9 +1399,18 @@
 
     function renderPlayersList() {
       playersListContainer.innerHTML = '';
+      if (sideMiniScoresContainer) sideMiniScoresContainer.innerHTML = '';
+      if (sideRoundBadge) sideRoundBadge.textContent = `T${gameState.currentRound}`;
+
+      const activeTurnSum = (gameState.currentTurnDarts || []).reduce((acc, d) => acc + d.points, 0);
 
       gameState.players.forEach((player, idx) => {
         const isActive = idx === gameState.activePlayerIndex;
+        const currentDisplayScore = isActive 
+          ? Math.max(0, player.turnStartScore - activeTurnSum) 
+          : player.remainingScore;
+
+        // 1. Sol Panel: Detaylı Oyuncu Kartı
         const div = document.createElement('div');
         div.className = `flex items-center justify-between p-3 rounded-xl transition duration-150 border ${
           isActive
@@ -1407,12 +1439,40 @@
             <span class="text-2xl font-black font-digital ${
               isActive ? 'text-amber-400' : 'text-slate-300'
             }">
-              ${player.remainingScore}
+              ${currentDisplayScore}
             </span>
           </div>
         `;
-
         playersListContainer.appendChild(div);
+
+        // 2. Dartın Sağ Tarafı: Kompakt Mini Skor Kutucuğu
+        if (sideMiniScoresContainer) {
+          const miniDiv = document.createElement('div');
+          miniDiv.className = `flex items-center justify-between px-2.5 py-1.5 rounded-xl border transition ${
+            isActive
+              ? 'bg-amber-500/20 border-amber-500/70 shadow-md ring-1 ring-amber-500/40'
+              : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
+          }`;
+
+          miniDiv.innerHTML = `
+            <div class="flex items-center gap-1.5 min-w-0 pr-1">
+              <span class="w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                isActive ? 'bg-amber-400 animate-pulse' : 'bg-slate-600'
+              }"></span>
+              <span class="text-xs font-bold truncate max-w-[80px] sm:max-w-[90px] ${
+                isActive ? 'text-amber-300 font-extrabold' : 'text-slate-300'
+              }">
+                ${player.name}
+              </span>
+            </div>
+            <span class="font-digital font-black text-sm sm:text-base ${
+              isActive ? 'text-amber-400' : 'text-slate-300'
+            }">
+              ${currentDisplayScore}
+            </span>
+          `;
+          sideMiniScoresContainer.appendChild(miniDiv);
+        }
       });
     }
 
